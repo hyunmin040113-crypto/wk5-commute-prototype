@@ -1,0 +1,994 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="출근길">
+<meta name="theme-color" content="#FFFFFF">
+<title>출근길 프로토타입</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+:root{
+  --bg:#FFFFFF; --outer:#F4F4F2;
+  --primary:#4A5645; --primary-press:#3C4738;
+  --sage:#EEF0E8; --sage-2:#E2E6D9;
+  --lav:#E9E5F2; --lav-2:#B9B0D6; --lav-3:#8E84B8;
+  --accent:#B9826B;
+  --text:#2B2B2B; --sub:#8A8A85; --muted:#B2B2AC; --line:#E8E8E3;
+  --top-inset:54px; --bottom-inset:34px;
+  --W:393px; --H:852px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:var(--outer);color:var(--text);
+  font-family:"Pretendard",-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;overscroll-behavior:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;-webkit-user-select:none;user-select:none}
+svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* ---------- Stage / iPhone frame (desktop) ---------- */
+.stage{min-height:100dvh;display:flex;align-items:center;justify-content:center;gap:40px;padding:20px}
+.stage-note{width:220px;font-size:12.5px;line-height:1.7;color:var(--sub)}
+.stage-note b{display:block;font-size:15px;color:var(--text);font-weight:600;margin-bottom:6px}
+.stage-note .kbd{display:inline-block;padding:1px 6px;border:1px solid var(--line);border-radius:6px;background:#fff;font-size:11px}
+.fit{position:relative;flex:none}
+.device{position:absolute;left:0;top:0;transform-origin:0 0;width:calc(var(--W) + 24px);height:calc(var(--H) + 24px);
+  padding:12px;border-radius:68px;background:#1B1B1B;box-shadow:0 0 0 2px #3a3a3a inset,0 30px 80px rgba(0,0,0,.18)}
+.screen-area{position:relative;width:var(--W);height:var(--H);border-radius:56px;overflow:hidden;background:var(--bg);isolation:isolate}
+.island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:126px;height:37px;border-radius:20px;background:#000;z-index:60}
+.statusbar{position:absolute;top:0;left:0;right:0;height:54px;display:flex;align-items:center;justify-content:space-between;
+  padding:4px 34px 0 50px;z-index:55;font-size:16.5px;font-weight:600;pointer-events:none;color:#000}
+.statusbar.light{color:#fff}
+.statusbar .sb-r{display:flex;gap:6px;align-items:center}
+.home-ind{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:#111;z-index:70;pointer-events:none}
+.home-ind.light{background:#fff}
+
+/* ---------- Real phone: full-bleed app ---------- */
+@media (max-width:500px){
+  :root{--top-inset:env(safe-area-inset-top,20px);--bottom-inset:env(safe-area-inset-bottom,0px);--W:100vw;--H:100dvh}
+  html,body{overflow:hidden;background:var(--bg)}
+  .stage{padding:0;display:block;min-height:0}
+  .stage-note,.island,.statusbar,.home-ind{display:none}
+  .fit{width:100vw!important;height:100dvh!important}
+  .device{position:static;transform:none!important;width:100vw;height:100dvh;padding:0;border-radius:0;background:none;box-shadow:none}
+  .screen-area{border-radius:0}
+}
+
+/* ---------- Screen scaffold ---------- */
+.scr{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--bg);z-index:1}
+.scr.enter{animation:enter .28s cubic-bezier(.2,.8,.2,1)}
+.scr.enter-back{animation:enterBack .28s cubic-bezier(.2,.8,.2,1)}
+@keyframes enter{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:none}}
+@keyframes enterBack{from{opacity:0;transform:translateX(-28px)}to{opacity:1;transform:none}}
+.hdr{flex:none;padding-top:var(--top-inset);height:calc(var(--top-inset) + 54px);display:flex;align-items:center;justify-content:space-between;
+  padding-left:10px;padding-right:10px;border-bottom:1px solid var(--line)}
+.hdr h1{font-size:16px;font-weight:500;letter-spacing:-.01em}
+.hdr button{width:44px;height:44px;display:grid;place-items:center;color:#55554F}
+.hdr button svg.i{width:22px;height:22px}
+.body{flex:1;overflow-y:auto;overflow-x:hidden;padding:24px 20px 28px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.body::-webkit-scrollbar{display:none}
+.tabbar{flex:none;height:calc(50px + var(--bottom-inset));padding-bottom:var(--bottom-inset);border-top:1px solid var(--line);display:flex;background:#fff}
+.tabbar button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10px;color:var(--muted)}
+.tabbar button svg.i{width:22px;height:22px}
+.tabbar button.on{color:var(--text)}
+
+/* ---------- Type & atoms ---------- */
+.eyebrow{font-size:10.5px;letter-spacing:.17em;font-weight:600;color:var(--sub);text-transform:uppercase}
+.title{font-size:27px;font-weight:300;line-height:1.38;letter-spacing:-.03em;margin:10px 0 10px}
+.title b{font-weight:500}
+.lead{font-size:13px;color:var(--sub);line-height:1.65}
+.dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--primary);vertical-align:middle}
+.dot.acc{background:var(--accent)}
+.card{border:1px solid var(--line);border-radius:16px;background:#fff}
+.btn{height:52px;border-radius:12px;width:100%;display:flex;align-items:center;justify-content:center;gap:10px;font-size:14.5px;font-weight:500;transition:transform .12s,background .12s}
+.btn:active{transform:scale(.985)}
+.btn svg.i{width:18px;height:18px}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:active{background:var(--primary-press)}
+.btn-outline{border:1px solid var(--line);background:#fff;color:#4a4a45}
+.btn-sage{background:var(--sage);border:1px solid var(--sage-2);color:var(--primary)}
+.btn+.btn{margin-top:10px}
+.caption{font-size:11.5px;color:var(--muted);text-align:center;margin-top:14px}
+.tlink{display:flex;align-items:center;justify-content:center;gap:6px;margin:14px auto 0;font-size:12px;color:var(--sub)}
+.tlink svg.i{width:15px;height:15px}
+.icon-tile{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;flex:none;background:var(--sage);color:var(--primary)}
+.icon-tile.lav{background:var(--lav);color:#6E6597}
+.icon-tile.sand{background:#F1ECE6;color:#9A7461}
+.icon-tile.mist{background:#EDEFEC;color:#5d6a60}
+.bar{height:3px;border-radius:2px;background:var(--line);overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--primary);border-radius:2px;transition:width .3s}
+.mt8{margin-top:8px}.mt12{margin-top:12px}.mt16{margin-top:16px}.mt20{margin-top:20px}.mt24{margin-top:24px}.mt28{margin-top:28px}
+.row{display:flex;align-items:center}
+.spacer{flex:1}
+
+/* home */
+.date{font-size:12px;color:#5f5f5a;display:flex;align-items:center;gap:8px}
+.route{display:flex;align-items:center;gap:12px;padding:14px;width:100%;text-align:left;margin-top:22px;background:#FBFBF9}
+.route small{display:block;font-size:10.5px;color:var(--sub);margin-bottom:3px}
+.route b{font-size:13px;font-weight:500}
+.route .r-link{margin-left:auto;font-size:10.5px;color:var(--sub);display:flex;align-items:center;gap:2px}
+.route .r-link svg.i{width:13px;height:13px}
+.sec-head{display:flex;align-items:center;justify-content:space-between;margin-top:8px}
+.sec-head h2{font-size:19px;font-weight:400;letter-spacing:-.02em}
+.sec-head button{font-size:12px;color:#5f5f5a;display:flex;align-items:center;gap:4px}
+.sec-head button svg.i{width:15px;height:15px}
+.act{display:block;width:100%;text-align:left;padding:14px;margin-top:10px;position:relative;transition:border-color .15s,background .15s}
+.act:active{background:#FAFAF8}
+.act.featured{border-color:#D9DDD0}
+.act .sug{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--primary);margin-bottom:10px}
+.act .sug svg.i{width:14px;height:14px}
+.act .a-row{display:flex;align-items:center;gap:14px}
+.act .meta{font-size:10px;color:var(--sub)}
+.act .name{font-size:14px;font-weight:500;margin:3px 0 3px}
+.act .last{font-size:10.5px;color:var(--muted)}
+.act .num{position:absolute;top:12px;right:14px;font-size:10px;color:var(--muted)}
+.act .go{margin-left:auto;font-size:11px;color:#55554F;display:flex;align-items:center;gap:3px;padding-top:12px}
+.act .go svg.i{width:15px;height:15px}
+
+/* walk hero */
+.hero{margin-top:22px;overflow:hidden;position:relative}
+.hero .art{height:250px;position:relative;background:linear-gradient(180deg,#F7F6F2,#FBFAF7)}
+.hero .art svg{position:absolute;inset:0;width:100%;height:100%}
+.hero .chk{position:absolute;top:16px;right:16px;width:36px;height:36px;border-radius:50%;background:#fff;display:grid;place-items:center;color:var(--primary);box-shadow:0 2px 8px rgba(0,0,0,.05)}
+.hero .chk svg.i{width:18px;height:18px}
+.hero .cap{position:absolute;left:20px;bottom:18px}
+.hero .cap small{font-size:11px;color:var(--sub)}
+.hero .cap h3{font-size:28px;font-weight:300;line-height:1.3;letter-spacing:-.03em;margin-top:6px}
+.hero .foot{display:flex;gap:12px;align-items:center;padding:16px}
+.app-ico{width:52px;height:52px;border-radius:12px;background:#F7E98A;display:grid;place-items:center;color:#5B4BA6;flex:none}
+.app-ico svg.i{width:24px;height:24px}
+.hero .foot .f-t{flex:1;min-width:0}
+.hero .foot .f-row{display:flex;justify-content:space-between;font-size:11.5px}
+.hero .foot .f-row span:last-child{color:var(--sub)}
+.hero .foot .f-row.s{margin-top:5px;color:#5f5f5a}
+.hero .foot .f-row.s b{font-weight:600;color:var(--text)}
+.hero .bar{margin-top:9px}
+
+/* platform */
+.pinfo{display:flex;align-items:center;padding:18px 16px;margin-top:22px}
+.pinfo .tl{display:flex;flex-direction:column;align-items:center;margin-right:14px;align-self:stretch;padding:4px 0}
+.pinfo .tl i{width:7px;height:7px;border-radius:50%;background:#55554F}
+.pinfo .tl i.o{background:#fff;border:1px solid var(--muted)}
+.pinfo .tl span{flex:1;border-left:1px dashed var(--muted);margin:4px 0}
+.pinfo .lines{flex:1;display:flex;flex-direction:column;gap:12px;font-size:11.5px}
+.pinfo .lines div{display:flex;align-items:center;gap:8px;color:#5f5f5a}
+.pinfo .lines div:first-child{color:var(--text);font-weight:500}
+.pinfo .lines svg.i{width:16px;height:16px}
+.pinfo .big{font-size:24px;font-weight:600}
+.pinfo .big small{font-size:11px;font-weight:400;color:var(--sub);margin-left:3px}
+.ready{display:flex;gap:16px;margin-top:40px;align-items:stretch}
+.ready .thumb{width:104px;height:104px;border-radius:16px;background:var(--lav);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#6E6597;flex:none}
+.ready .thumb svg.i{width:34px;height:34px;stroke-width:1.4}
+.ready .thumb span{font-size:9px;letter-spacing:.12em;font-weight:600}
+.ready .rt{padding-top:4px}
+.ready h3{font-size:16px;font-weight:400;margin:10px 0 8px}
+.ready p{font-size:11px;color:var(--sub);line-height:1.6}
+
+/* active */
+.chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 11px;border-radius:13px;background:var(--sage);font-size:10.5px;color:var(--primary);font-weight:500}
+.chip.paused{background:#F3EEE9;color:#9A7461}
+.chip.paused .dot{background:#9A7461}
+.a-top{display:flex;justify-content:space-between;align-items:center}
+.a-top .seg{font-size:10.5px;color:var(--sub)}
+.coverbox{margin-top:16px;height:270px;border-radius:20px;background:linear-gradient(180deg,#ECE9F4,#E3DFEF);display:grid;place-items:center;position:relative;width:100%}
+.coverbox .cv{width:150px;height:210px;filter:drop-shadow(0 12px 18px rgba(80,70,130,.18))}
+.coverbox .pg{position:absolute;right:14px;bottom:14px;height:26px;padding:0 10px;border-radius:13px;background:rgba(255,255,255,.85);font-size:10.5px;display:flex;align-items:center;color:#55554F}
+.coverbox .hint{position:absolute;left:14px;bottom:14px;font-size:10.5px;color:#6E6597;display:flex;gap:4px;align-items:center}
+.coverbox .hint svg.i{width:13px;height:13px}
+.a-meta{display:flex;justify-content:space-between;font-size:11px;color:var(--sub);margin-top:12px}
+.a-meta span{display:flex;gap:5px;align-items:center}
+.a-meta svg.i{width:15px;height:15px}
+.tabs{display:flex;gap:22px;border-bottom:1px solid var(--line);margin-top:20px}
+.tabs button{font-size:12px;color:var(--muted);padding:0 0 10px;position:relative}
+.tabs button.on{color:var(--text)}
+.tabs button.on::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--primary)}
+.panel{padding:16px 0 4px;min-height:96px}
+.p-row{display:flex;justify-content:space-between;font-size:11.5px;color:#5f5f5a}
+.p-row b{font-size:12.5px;font-weight:600;color:var(--text)}
+.p-note{font-size:10.5px;color:var(--sub);margin-top:9px}
+.flow{display:flex;align-items:center;gap:6px;margin-top:14px;font-size:10.5px;color:var(--muted);flex-wrap:wrap}
+.flow span.on{color:var(--primary);font-weight:500}
+.flow i{font-style:normal;color:var(--muted)}
+
+/* transfer */
+.walkart{height:210px;border-radius:24px;background:#F1F1EC;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px}
+.walkart .wa-row{display:flex;align-items:center}
+.walkart .wa-a{width:64px;height:64px;border-radius:50%;background:#E3E6DC;display:grid;place-items:center;color:var(--primary)}
+.walkart .wa-a svg.i{width:30px;height:30px;stroke-width:1.4}
+.walkart .wa-b{width:46px;height:46px;border-radius:12px;background:#fff;display:grid;place-items:center;color:#55554F;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+.walkart .wa-line{width:96px;position:relative;height:10px;margin:0 6px}
+.walkart .wa-line::before{content:"";position:absolute;left:6px;right:6px;top:50%;border-top:1px dashed var(--muted)}
+.walkart .wa-line i{position:absolute;top:50%;width:8px;height:8px;border-radius:50%;transform:translate(-50%,-50%);background:#fff;border:1px solid var(--muted)}
+.walkart .wa-line i.m{background:var(--accent);border:0;width:10px;height:10px;animation:walkdot 3s ease-in-out infinite}
+@keyframes walkdot{0%{left:10%}50%{left:90%}100%{left:10%}}
+.walkart small{font-size:12px;color:var(--sub)}
+.saved{display:flex;align-items:center;gap:12px;padding:14px;margin-top:20px}
+.saved .s-t small{display:block;font-size:10px;color:var(--sub)}
+.saved .s-t b{display:block;font-size:13.5px;font-weight:500;margin:3px 0}
+.saved .s-t span{font-size:10.5px;color:var(--sub)}
+.saved .ok{margin-left:auto;width:28px;height:28px;border-radius:50%;background:var(--sage-2);display:grid;place-items:center;color:var(--primary)}
+.saved .ok svg.i{width:15px;height:15px}
+
+/* return / reminder / record */
+.orbit{height:150px;position:relative;display:grid;place-items:center}
+.orbit svg.orb{position:absolute;inset:0;width:100%;height:100%}
+.orbit .core{width:64px;height:64px;border-radius:18px;background:var(--sage);display:grid;place-items:center;color:var(--primary);position:relative}
+.orbit .core svg.i{width:30px;height:30px;stroke-width:1.4}
+.orbit .core.dark{width:72px;height:72px;border-radius:20px;background:var(--primary);color:#fff;transform:rotate(-8deg)}
+.orbit .halo{position:absolute;width:118px;height:118px;border-radius:50%;background:#F1EFE4}
+.rp-head{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
+.rp-head .eyebrow{display:flex;align-items:center;gap:7px;color:#55554F}
+.rp-head small{font-size:10.5px;color:var(--muted)}
+.bookcard{display:flex;gap:16px;padding:14px;margin-top:22px;align-items:center}
+.bookcard .cv{width:68px;height:94px;flex:none;border-radius:6px;overflow:hidden}
+.bookcard small{font-size:10.5px;color:var(--sub)}
+.bookcard b{display:block;font-size:14px;font-weight:500;margin:8px 0 12px}
+.bookcard .bp{display:flex;align-items:center;gap:10px;font-size:11px}
+.bookcard .bp .bar{width:56px}
+.bookcard .bp span{color:var(--muted)}
+.infobox{display:flex;gap:12px;align-items:center;padding:13px 14px;border-radius:14px;background:var(--sage);margin-top:12px;font-size:11px;color:#5f5f5a;line-height:1.6}
+.infobox .ib-i{width:32px;height:32px;border-radius:9px;background:#fff;display:grid;place-items:center;color:var(--primary);flex:none}
+.infobox .ib-i svg.i{width:17px;height:17px}
+.mini{display:flex;align-items:center;gap:12px;padding:14px;margin-top:24px}
+.mini b{display:block;font-size:13.5px;font-weight:500}
+.mini small{font-size:10.5px;color:var(--sub)}
+.mini .dot{margin-left:auto}
+.center{text-align:center}
+.metrics{display:flex;padding:18px 0;margin-top:22px}
+.metrics>div{flex:1;padding:0 18px}
+.metrics>div+div{border-left:1px solid var(--line)}
+.metrics small{font-size:10.5px;color:var(--sub)}
+.metrics .v{font-size:26px;font-weight:600;margin-top:8px;letter-spacing:-.02em}
+.metrics .v small{font-size:12px;font-weight:400;margin-left:3px;color:#5f5f5a}
+.metrics .v.sm{font-size:15px;padding-top:10px}
+.weekly{display:flex;gap:12px;align-items:center;padding:14px;border-radius:14px;background:var(--sage);margin-top:12px;font-size:11px;color:#5f5f5a;line-height:1.6}
+.weekly .tag{margin-left:auto;font-size:9px;letter-spacing:.14em;color:var(--sub);align-self:center}
+
+/* ---------- Overlays ---------- */
+.ov{position:absolute;inset:0;z-index:30;display:none}
+.ov.show{display:block}
+/* reader (simulated linked app) */
+#reader{background:#FCFBF8;display:none;flex-direction:column}
+#reader.show{display:flex;animation:rise .3s cubic-bezier(.2,.8,.2,1)}
+@keyframes rise{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
+#reader .rd-h{padding-top:var(--top-inset);height:calc(var(--top-inset) + 50px);display:flex;align-items:center;padding-left:14px;padding-right:16px;gap:8px;border-bottom:1px solid #EFEDE6;font-size:13px}
+#reader .rd-h small{margin-left:auto;font-size:11px;color:var(--sub)}
+#reader .rd-tag{font-size:10px;color:#6E6597;background:var(--lav);padding:3px 8px;border-radius:8px}
+#reader .rd-b{flex:1;overflow:hidden;padding:26px 26px 0}
+#reader .rd-b h4{font-size:12px;color:var(--sub);font-weight:400;margin-bottom:18px}
+#reader .ln{height:9px;border-radius:5px;background:#ECEAE3;margin-bottom:13px}
+#reader .note{font-size:12.5px;line-height:1.8;color:#5f5f5a;margin-bottom:20px}
+#reader .rd-f{padding:14px 22px calc(var(--bottom-inset) + 14px);border-top:1px solid #EFEDE6}
+#reader .rd-f .row{font-size:11px;color:var(--sub);justify-content:space-between;margin-bottom:8px}
+#reader .back-pill{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(var(--bottom-inset) + 74px);height:40px;padding:0 16px;border-radius:20px;background:var(--primary);color:#fff;font-size:12.5px;display:flex;align-items:center;gap:6px;box-shadow:0 8px 20px rgba(40,50,35,.25);white-space:nowrap}
+#reader .back-pill svg.i{width:16px;height:16px}
+/* sns */
+#sns{background:#fff}
+#sns .sn-h{padding-top:var(--top-inset);height:calc(var(--top-inset) + 48px);display:flex;align-items:center;justify-content:space-between;padding-left:18px;padding-right:18px;font-weight:700;font-size:18px}
+#sns .stories{display:flex;gap:12px;padding:8px 16px 14px;border-bottom:1px solid #f0f0f0}
+#sns .stories i{width:58px;height:58px;border-radius:50%;background:conic-gradient(#e7d6cf,#d8d2ea,#e7d6cf);flex:none;padding:2px}
+#sns .post{padding:12px 16px}
+#sns .post .ph{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+#sns .post .ph i{width:30px;height:30px;border-radius:50%;background:#e8e8e8}
+#sns .post .ph span{width:90px;height:9px;border-radius:5px;background:#e8e8e8}
+#sns .post .img{height:300px;border-radius:4px;background:linear-gradient(135deg,#ececec,#f6f6f6)}
+#sns .post .acts{display:flex;gap:14px;margin-top:10px;color:#999}
+#sns .sn-tag{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(var(--bottom-inset) + 14px);font-size:10.5px;color:#999;background:#f4f4f4;padding:5px 10px;border-radius:10px;white-space:nowrap}
+/* lock screen */
+#lock{background:linear-gradient(170deg,#C9CEC0 0%,#9DA796 45%,#6D7A68 100%);color:#fff;text-align:center}
+#lock .lk-d{margin-top:calc(var(--top-inset) + 26px);font-size:17px;font-weight:500;opacity:.9}
+#lock .lk-t{font-size:88px;font-weight:600;letter-spacing:-.02em;line-height:1;margin-top:4px}
+#lock .la{position:absolute;left:14px;right:14px;bottom:calc(var(--bottom-inset) + 90px);border-radius:24px;background:rgba(255,255,255,.88);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);color:var(--text);padding:16px;text-align:left}
+#lock .la .la-h{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--sub)}
+#lock .la .la-h .ai{width:22px;height:22px;border-radius:6px;background:var(--primary);display:grid;place-items:center;color:#fff}
+#lock .la .la-h .ai svg.i{width:13px;height:13px}
+#lock .la b{display:block;font-size:15px;font-weight:600;margin-top:10px}
+#lock .la p{font-size:12px;color:#5f5f5a;margin-top:3px}
+#lock .la .segs{display:flex;gap:3px;margin-top:12px}
+#lock .la .segs i{height:4px;border-radius:2px;background:#D9DBD3}
+#lock .la .segs i.on{background:var(--primary)}
+#lock .lk-hint{position:absolute;left:0;right:0;bottom:calc(var(--bottom-inset) + 40px);font-size:12px;opacity:.85}
+/* push banner (iOS style) */
+#push{position:absolute;left:10px;right:10px;top:calc(var(--top-inset) + 4px);z-index:45;border-radius:22px;background:rgba(250,250,248,.94);
+  -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);box-shadow:0 10px 30px rgba(0,0,0,.14);padding:12px 14px;display:flex;gap:11px;
+  transform:translateY(-160%);transition:transform .45s cubic-bezier(.2,.9,.25,1.1);text-align:left;width:auto}
+#push.show{transform:none}
+#push .pi{width:38px;height:38px;border-radius:10px;background:var(--primary);color:#fff;display:grid;place-items:center;flex:none}
+#push .pi svg.i{width:20px;height:20px}
+#push .pt{flex:1;min-width:0}
+#push .pt .ph{display:flex;justify-content:space-between;font-size:11px;color:var(--sub)}
+#push .pt b{display:block;font-size:13px;font-weight:600;margin-top:2px}
+#push .pt p{font-size:12px;color:#5f5f5a;margin-top:1px}
+/* transfer hint (small, non-blocking) */
+#hint{position:absolute;left:14px;right:14px;top:calc(var(--top-inset) + 62px);z-index:44;background:#fff;border:1px solid var(--line);border-radius:16px;
+  box-shadow:0 10px 26px rgba(0,0,0,.08);padding:11px 12px;display:flex;align-items:center;gap:11px;transform:translateY(-12px);opacity:0;pointer-events:none;transition:.3s}
+#hint.show{transform:none;opacity:1;pointer-events:auto}
+#hint .icon-tile{width:34px;height:34px;border-radius:10px}
+#hint .icon-tile svg.i{width:18px;height:18px}
+#hint b{display:block;font-size:12.5px;font-weight:600}
+#hint small{font-size:10.5px;color:var(--sub)}
+#hint button{margin-left:auto;font-size:12px;font-weight:600;color:var(--primary);padding:8px 10px;border-radius:10px;background:var(--sage);white-space:nowrap}
+/* toast */
+#toast{position:absolute;left:50%;bottom:calc(var(--bottom-inset) + 66px);transform:translate(-50%,10px);z-index:50;background:rgba(43,43,43,.92);color:#fff;font-size:12px;
+  padding:10px 16px;border-radius:20px;opacity:0;transition:.25s;pointer-events:none;white-space:nowrap;max-width:90%}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* ---------- TEST tab & simulation panel ---------- */
+#testTab{position:absolute;right:0;top:50%;transform:translateY(-50%);z-index:58;width:24px;height:66px;border-radius:9px 0 0 9px;background:var(--primary);
+  color:#fff;font-size:9.5px;font-weight:700;letter-spacing:.2em;writing-mode:vertical-rl;display:flex;align-items:center;justify-content:center;opacity:.92}
+#simDim{position:absolute;inset:0;z-index:59;background:rgba(0,0,0,.18);opacity:0;pointer-events:none;transition:.25s}
+#simDim.show{opacity:1;pointer-events:auto}
+#sim{position:absolute;top:0;right:0;bottom:0;width:300px;max-width:86%;z-index:61;background:#FAFAF7;border-left:2px dashed #C9CCBF;
+  transform:translateX(102%);transition:transform .3s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column}
+#sim.show{transform:none}
+#sim .sm-h{padding:calc(var(--top-inset) + 10px) 18px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
+#sim .sm-h b{font-size:13px;letter-spacing:.06em}
+#sim .sm-h b span{font-size:9.5px;background:var(--primary);color:#fff;padding:2px 6px;border-radius:5px;margin-right:6px;letter-spacing:.15em}
+#sim .sm-b{flex:1;overflow-y:auto;padding:14px 18px calc(var(--bottom-inset) + 18px);scrollbar-width:none}
+#sim h5{font-size:10px;letter-spacing:.14em;color:var(--sub);font-weight:600;margin:18px 0 8px}
+#sim h5:first-child{margin-top:0}
+#sim .stat{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:11.5px;line-height:1.9}
+#sim .stat div{display:flex;justify-content:space-between}
+#sim .stat span{color:var(--sub)}
+#sim .grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+#sim .grid button,#sim .speed button{height:36px;border-radius:9px;border:1px solid var(--line);background:#fff;font-size:11.5px;color:#4a4a45}
+#sim .grid button.cur{border-color:var(--primary);color:var(--primary);font-weight:600;background:var(--sage)}
+#sim .grid button.ev{background:#fff;border-color:#D9C5BA;color:#8E5F4B}
+#sim .speed{display:flex;gap:6px}
+#sim .speed button{flex:1}
+#sim .speed button.on{background:var(--primary);color:#fff;border-color:var(--primary)}
+#sim .reset{width:100%;height:38px;border-radius:9px;margin-top:18px;font-size:11.5px;color:var(--sub);border:1px dashed var(--muted)}
+#sim .sm-note{font-size:10.5px;color:var(--muted);line-height:1.6;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="stage-note">
+    <b>출근길 프로토타입</b>
+    김나리 · 출근 시나리오 (08:00)<br>
+    iPhone 15 / 16 Pro · 393 × 852 pt<br><br>
+    화면 오른쪽의 <span class="kbd">TEST</span> 탭에서 이동 구간을 바꾸거나 환승·이탈·하차 상황을 만들 수 있어요.<br><br>
+    휴대폰에서 열면 전체 화면 앱으로 보여요. Safari에서 '홈 화면에 추가'를 하면 주소창 없이 열려요.
+  </div>
+  <div class="fit" id="fit">
+    <div class="device" id="device">
+      <div class="screen-area" id="app">
+        <div class="island"></div>
+        <div class="statusbar" id="statusbar">
+          <span data-bind="clockShort">8:00</span>
+          <span class="sb-r">
+            <svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+            <svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor"><path d="M8 2.4c2.3 0 4.4.9 6 2.4l1.2-1.3A10.4 10.4 0 0 0 8 .6 10.4 10.4 0 0 0 .8 3.5L2 4.8a8.6 8.6 0 0 1 6-2.4Zm0 3.6c1.3 0 2.5.5 3.4 1.3l1.2-1.3A6.7 6.7 0 0 0 8 4.2 6.7 6.7 0 0 0 3.4 6l1.2 1.3C5.5 6.5 6.7 6 8 6Zm0 3.6c.4 0 .9.2 1.2.5L8 11.4 6.8 10.1c.3-.3.8-.5 1.2-.5Z"/></svg>
+            <svg width="27" height="13" viewBox="0 0 27 13" fill="none"><rect x=".5" y=".5" width="23" height="12" rx="3.5" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="17" height="9" rx="2" fill="currentColor"/><path d="M25 4.5v4c.8-.3 1.4-1.1 1.4-2s-.6-1.7-1.4-2Z" fill="currentColor" opacity=".5"/></svg>
+          </span>
+        </div>
+
+        <div id="screens"></div>
+
+        <!-- simulated linked app (전자책) -->
+        <div class="ov" id="reader"></div>
+        <!-- simulated SNS feed -->
+        <div class="ov" id="sns"></div>
+        <!-- simulated lock screen -->
+        <div class="ov" id="lock"></div>
+
+        <button id="push" type="button"></button>
+        <div id="hint"></div>
+        <div id="toast"></div>
+
+        <button id="testTab" type="button" aria-label="테스트 패널 열기">TEST</button>
+        <div id="simDim"></div>
+        <aside id="sim"></aside>
+        <div class="home-ind" id="homeInd"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   Icons (Lucide-style line icons)
+   ========================================================= */
+const IC = {
+  back:'<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
+  menu:'<path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/>',
+  right:'<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+  chev:'<path d="m9 18 6-6-6-6"/>',
+  home:'<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  history:'<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
+  pin:'<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
+  user:'<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  book:'<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>',
+  film:'<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 3v18"/><path d="M3 7.5h4"/><path d="M3 12h18"/><path d="M3 16.5h4"/><path d="M17 3v18"/><path d="M17 7.5h4"/><path d="M17 16.5h4"/>',
+  news:'<path d="M15 18h-5"/><path d="M18 14h-8"/><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-4 0v-9a2 2 0 0 1 2-2h2"/><rect width="8" height="4" x="10" y="6" rx="1"/>',
+  train:'<path d="M8 3.1V7a4 4 0 0 0 8 0V3.1"/><path d="m9 15-1-1"/><path d="m15 15 1-1"/><path d="M9 19c-2.8 0-5-2.2-5-5v-4a8 8 0 0 1 16 0v4c0 2.8-2.2 5-5 5Z"/><path d="m8 19-2 3"/><path d="m16 19 2 3"/>',
+  clock:'<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  check:'<path d="M20 6 9 17l-5-5"/>',
+  pause:'<circle cx="12" cy="12" r="10"/><path d="M10 15V9"/><path d="M14 15V9"/>',
+  play:'<circle cx="12" cy="12" r="10"/><path d="m10 8 6 4-6 4Z"/>',
+  sparkles:'<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>',
+  trend:'<path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/>',
+  downleft:'<path d="M17 7 7 17"/><path d="M17 17H7V7"/>',
+  x:'<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  heart:'<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>',
+  msg:'<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
+  send:'<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
+  tap:'<path d="M9 9V4.5a1.5 1.5 0 0 1 3 0V12"/><path d="M12 11.5V10a1.5 1.5 0 0 1 3 0v2"/><path d="M15 11.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1a6 6 0 0 1-4.6-2.2L4 15.5a1.6 1.6 0 0 1 2.4-2.1L9 16"/>',
+};
+const ic = (n, cls='') => `<svg class="i ${cls}" viewBox="0 0 24 24">${IC[n]}</svg>`;
+
+/* =========================================================
+   Illustrations
+   ========================================================= */
+let _gid = 0;
+function cover(){
+  const id = 'cg' + (++_gid);
+  return `<svg viewBox="0 0 120 168" width="100%" height="100%" preserveAspectRatio="xMidYMid slice">
+    <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#DCD6EE"/><stop offset="1" stop-color="#B7AED6"/></linearGradient></defs>
+    <rect width="120" height="168" rx="3" fill="url(#${id})"/>
+    <circle cx="84" cy="44" r="20" fill="#F7F1D3"/>
+    <g fill="#fff" opacity=".95"><ellipse cx="30" cy="80" rx="16" ry="7"/><ellipse cx="42" cy="76" rx="10" ry="8"/><ellipse cx="94" cy="84" rx="14" ry="6"/><ellipse cx="104" cy="80" rx="8" ry="6"/></g>
+    <path d="M18 168V104l46-12 42 12v64Z" fill="#EEEBF5"/>
+    <g stroke="#D3CCE5" stroke-width=".8"><path d="M18 118h88M18 132h88M18 146h88M40 98v70M64 92v76M86 98v70"/></g>
+    <path d="M24 140c6-12 12-12 18 0s12 12 18 0" fill="none" stroke="#8E84B8" stroke-width="1.6"/>
+    <path d="M20 66l2 5 5 2-5 2-2 5-2-5-5-2 5-2Z" fill="#fff" opacity=".9"/>
+    <rect width="7" height="168" fill="#9F95C6" opacity=".55"/>
+    <text x="64" y="30" text-anchor="middle" font-size="9.5" fill="#4C4668" font-family="Pretendard,sans-serif">달러구트</text>
+    <text x="64" y="43" text-anchor="middle" font-size="9.5" fill="#4C4668" font-family="Pretendard,sans-serif">꿈 백화점 1</text>
+  </svg>`;
+}
+const HERO_ART = `<svg viewBox="0 0 320 250" preserveAspectRatio="xMidYMid slice">
+  <circle cx="212" cy="78" r="54" fill="#FAF6E2"/>
+  <g fill="#fff" stroke="#EFEDE7" stroke-width="1"><path d="M40 200a14 14 0 0 1 14-14 18 18 0 0 1 34-2 12 12 0 0 1 14 16Z"/><path d="M208 206a12 12 0 0 1 12-12 16 16 0 0 1 30-2 10 10 0 0 1 12 14Z"/></g>
+  <path d="M60 148l3 7 7 3-7 3-3 7-3-7-7-3 7-3Z" fill="#fff" stroke="#EEEBE4"/>
+  <path d="M30 250v-46l60-18 70 10 70-16 60 20v50Z" fill="#F3F2EE"/>
+  <g stroke="#ECEAE4" stroke-width="1"><path d="M30 222h260M30 238h260M90 186v64M160 196v54M230 180v70"/></g>
+</svg>`;
+const ORBIT = `<svg class="orb" viewBox="0 0 320 150" fill="none">
+  <ellipse cx="160" cy="75" rx="78" ry="56" stroke="#E2E2DC" transform="rotate(-14 160 75)"/>
+  <ellipse cx="160" cy="75" rx="70" ry="48" stroke="#ECECE6" stroke-dasharray="2 4" transform="rotate(20 160 75)"/>
+  <path d="M222 40v14M215 47h14M217 42l10 10M227 42l-10 10" stroke="#B9826B" stroke-width="1.2" stroke-linecap="round"/>
+  <path d="M98 108l2 5 5 2-5 2-2 5-2-5-5-2 5-2Z" stroke="#B9826B" stroke-width="1"/>
+</svg>`;
+
+/* =========================================================
+   Simulated journey data
+   ========================================================= */
+const H = 3600, M = 60;
+const T = {walk:8*H, plat1:8*H+7*M, ride1:8*H+10*M, transfer:8*H+28*M, plat2:8*H+33*M, ride2:8*H+36*M, alight:8*H+51*M};
+const SEGS = ['walk','plat1','ride1','transfer','plat2','ride2','alight'];
+const SEG_LABEL = {idle:'출발 전', walk:'역까지 도보', plat1:'승강장 대기', ride1:'지하철 1구간', transfer:'환승 이동', plat2:'승강장 대기', ride2:'지하철 2구간', alight:'하차 후 도보'};
+const TOTAL = 284, SEC_PER_PAGE = 100;   // 32분 ≈ 19페이지
+const TITLES = {home:'홈', walk:'이동 중', platform:'승강장', active:'활동 중', transfer:'이동 구간', ret:'RETURN POINT', reminder:'잠깐 알림', record:'이동 기록'};
+
+function fresh(keep = {}){
+  const p = keep.nextPage ?? 132;
+  return {
+    screen:'home', hist:[], clock:T.walk, speed:keep.speed ?? 10,
+    page:p, startPage:p, savedPage:p, savedAt:null, readSec:0, acc:0,
+    seg:'idle', rideNo:1, flow:[], paused:false, done:false,
+    reader:false, sns:false, tab:'flow', completed:keep.completed || false,
+    weeklyBase:keep.weeklyBase ?? 96,
+  };
+}
+let S = fresh();
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const pad = n => String(n).padStart(2,'0');
+const hhmm = t => `${pad(Math.floor(t/H)%24)}:${pad(Math.floor(t%H/M))}`;
+const mmss = t => `${pad(Math.floor(t/M))}:${pad(Math.floor(t%M))}`;
+const readMin = () => Math.max(0, Math.round(S.readSec/M));
+const pct = () => Math.round(S.page/TOTAL*100);
+const minsUntil = t => Math.max(0, Math.ceil((t - S.clock)/M));
+const isReading = () => S.screen==='active' && !S.paused && !S.sns && !S.done;
+const weekly = () => { const m = S.weeklyBase + readMin(); return `${Math.floor(m/60)}시간 ${m%60}분`; };
+
+const BIND = {
+  clock: () => hhmm(S.clock),
+  clockShort: () => hhmm(S.clock).replace(/^0/,''),
+  page: () => S.page,
+  saved: () => S.savedPage,
+  pct: () => pct() + '%',
+  read: () => mmss(S.readSec),
+  readMin: () => readMin(),
+  more: () => S.page - S.startPage,
+  toStation: () => minsUntil(T.plat1),
+  toTrain: () => minsUntil(S.seg==='plat2' ? T.ride2 : T.ride1),
+  seg: () => SEG_LABEL[S.seg],
+  weekly: () => weekly(),
+};
+function refresh(){
+  document.querySelectorAll('[data-bind]').forEach(el => { const f = BIND[el.dataset.bind]; if (f) el.textContent = f(); });
+  document.querySelectorAll('[data-w]').forEach(el => { el.style.width = (el.dataset.w==='page' ? S.page/TOTAL*100 : 0) + '%'; });
+  const sel = $('#platHint'); if (sel) sel.textContent = minsUntil(S.seg==='plat2'?T.ride2:T.ride1) > 0 ? '짧게 먼저 읽거나, 탑승 후에 시작할 수 있어요.' : '열차가 곧 들어와요. 탑승 후 이어서 읽어도 좋아요.';
+  if (S.simOpen) renderSimStat();
+}
+
+/* =========================================================
+   Screens
+   ========================================================= */
+const header = (name) => `<header class="hdr">
+  <button type="button" onclick="goBack()" aria-label="뒤로">${ic('back')}</button>
+  <h1>${TITLES[name]}</h1>
+  <button type="button" onclick="toast('메뉴는 이번 프로토타입 범위 밖이에요')" aria-label="메뉴">${ic('menu')}</button>
+</header>`;
+const tabbar = (on='home') => `<nav class="tabbar">
+  ${[['home','홈','home'],['history','기록','history'],['pin','경로','route'],['user','마이페이지','my']].map(([i,l,k]) =>
+    `<button type="button" class="${k===on?'on':''}" onclick="tabNav('${k}')">${ic(i)}<span>${l}</span></button>`).join('')}
+</nav>`;
+
+const VIEWS = {
+home(){
+  const hasPast = S.completed;
+  return `<div class="body">
+    <div class="date"><i class="dot"></i>10월 10일 토요일 · <span data-bind="clock"></span></div>
+    <h2 class="title">좋은 아침이에요<br>출근길을 시작해볼까요?</h2>
+    <p class="lead">하고 싶은 활동을 고르면, 멈춘 자리에서도<br>바로 다시 이어갈 수 있어요.</p>
+    <button type="button" class="card route" onclick="toast('경로 설정은 이번 프로토타입 범위 밖이에요')">
+      <span class="icon-tile">${ic('train')}</span>
+      <span><small>오늘의 이동 경로</small><b>집에서 회사까지 · 약 45분</b></span>
+      <span class="r-link">목적지 재설정${ic('chev')}</span>
+    </button>
+    <div class="eyebrow mt28">Pick your activity</div>
+    <div class="sec-head"><h2>어떤 활동을 할까요?</h2><button type="button" onclick="tabNav('history')">기록${ic('right')}</button></div>
+    <button type="button" class="card act featured" onclick="pickBook()">
+      <div class="sug">${ic('sparkles')}보통 이 시간대에는 독서를 선택했어요</div>
+      <span class="num">01</span>
+      <div class="a-row">
+        <span class="icon-tile lav">${ic('book')}</span>
+        <span><span class="meta">독서 · 밀리의 서재</span><div class="name">전자책 이어읽기</div><span class="last">달러구트 꿈 백화점 · ${S.page}p${hasPast?'부터':''}</span></span>
+        <span class="go">바로 시작${ic('right')}</span>
+      </div>
+    </button>
+    <button type="button" class="card act" onclick="otherAct()">
+      <span class="num">02</span>
+      <div class="a-row">
+        <span class="icon-tile sand">${ic('film')}</span>
+        <span><span class="meta">영상 · 넷플릭스</span><div class="name">해리포터 시리즈 정주행</div><span class="last">마법사의 돌 · 01:01:18</span></span>
+        <span class="go">바로 시작${ic('right')}</span>
+      </div>
+    </button>
+    <button type="button" class="card act" onclick="otherAct()">
+      <span class="num">03</span>
+      <div class="a-row">
+        <span class="icon-tile mist">${ic('news')}</span>
+        <span><span class="meta">아티클 · 뉴스레터</span><div class="name">트렌드·뉴스 읽기</div><span class="last">오늘의 아티클 1개</span></span>
+        <span class="go">바로 시작${ic('right')}</span>
+      </div>
+    </button>
+  </div>${tabbar('home')}`;
+},
+walk(){
+  return `<div class="body">
+    <div class="eyebrow">On the way</div>
+    <h2 class="title">역까지 <span data-bind="toStation"></span>분,</h2>
+    <p class="lead">도착하면 전자책을 바로 이어볼 수 있게 준비해둘게요.</p>
+    <div class="card hero">
+      <div class="art">${HERO_ART}
+        <span class="chk">${ic('check')}</span>
+        <div class="cap"><small>오늘의 출근길</small><h3>달러구트<br>꿈 백화점 1</h3></div>
+      </div>
+      <div class="foot">
+        <span class="app-ico">${ic('book')}</span>
+        <div class="f-t">
+          <div class="f-row"><span>밀리의 서재</span><span>오늘의 출근길</span></div>
+          <div class="f-row s"><span><span data-bind="page"></span>p부터 이어갈게요</span><b data-bind="pct"></b></div>
+          <div class="bar"><i data-w="page"></i></div>
+        </div>
+      </div>
+    </div>
+    <button type="button" class="btn btn-primary mt20" onclick="arriveStation()">역에 도착했어요${ic('right')}</button>
+    <p class="caption">걸을 때는 화면을 보지 않아도 괜찮아요</p>
+  </div>${tabbar()}`;
+},
+platform(){
+  return `<div class="body">
+    <div class="eyebrow">At the platform</div>
+    <h2 class="title">열차 도착까지 <span data-bind="toTrain"></span>분 남았어요!</h2>
+    <p class="lead" id="platHint"></p>
+    <div class="card pinfo">
+      <div class="tl"><i></i><span></span><i class="o"></i></div>
+      <div class="lines">
+        <div>${ic('train')}2호선 · 을지로입구 방면</div>
+        <div>${ic('clock')}열차 도착까지 약 <span data-bind="toTrain"></span>분</div>
+      </div>
+      <div class="big"><span data-bind="toTrain"></span><small>분</small></div>
+    </div>
+    <div class="ready">
+      <div class="thumb">${ic('book')}<span>2 MIN</span></div>
+      <div class="rt">
+        <div class="eyebrow">Ready when you are</div>
+        <h3>잠깐 먼저 읽어볼까요?</h3>
+        <p>달러구트 꿈 백화점<br><span data-bind="page"></span>p부터 준비되어 있어요</p>
+      </div>
+    </div>
+    <button type="button" class="btn btn-primary mt28" onclick="readFirst()">2분 먼저 읽기${ic('right')}</button>
+    <button type="button" class="btn btn-outline" onclick="boardLater()">탑승 후 이어서 하기${ic('chev')}</button>
+    <p class="caption">원하는 쪽을 선택하면 마지막 위치를 기억할게요</p>
+  </div>${tabbar()}`;
+},
+active(){
+  const ride2 = S.rideNo === 2;
+  const steps = ['독서 시작','환승으로 잠시 중단','다시 독서로 복귀'];
+  const reached = ride2 ? 3 : (S.flow.includes('pause') ? 2 : 1);
+  return `<div class="body">
+    <div class="a-top">
+      <span class="chip ${S.paused?'paused':''}"><i class="dot"></i>${S.paused?'잠시 멈춤':'집중 중'}</span>
+      <span class="seg">출근길 · <span data-bind="seg"></span></span>
+    </div>
+    <button type="button" class="coverbox" onclick="openReader()" aria-label="밀리의 서재에서 열기">
+      <div class="cv">${cover()}</div>
+      <span class="hint">${ic('tap')}탭하면 책이 열려요</span>
+      <span class="pg"><span data-bind="page"></span>p / ${TOTAL} p</span>
+    </button>
+    <div class="a-meta"><span>밀리의 서재 · 달러구트 꿈 백화점</span><span>${ic('clock')}<span data-bind="read"></span></span></div>
+    <div class="tabs">
+      <button type="button" class="${S.tab==='flow'?'on':''}" onclick="setTab('flow')">이동 흐름</button>
+      <button type="button" class="${S.tab==='point'?'on':''}" onclick="setTab('point')">복귀 지점</button>
+    </div>
+    <div class="panel">${S.tab==='flow' ? `
+      <div class="p-row"><span>지금 하고 있는 활동</span><b><span data-bind="page"></span>p</b></div>
+      <div class="bar mt8"><i data-w="page"></i></div>
+      <p class="p-note">오늘은 <span data-bind="more"></span>페이지를 더 읽었어요.</p>
+      <div class="flow">${steps.map((s,i)=>`<span class="${i<reached?'on':''}">${s}</span>${i<2?'<i>→</i>':''}`).join('')}</div>` : `
+      <div class="p-row"><span>마지막 저장 위치</span><b><span data-bind="saved"></span>p</b></div>
+      <p class="p-note">${S.savedAt ? S.savedAt + '에 저장됨' : '활동을 멈추면 자동으로 저장돼요'} · 자동 저장 켜짐</p>
+      <p class="p-note">환승·하차로 멈춰도 다음 승강장에서 한 번에 이어갈 수 있어요.</p>`}
+    </div>
+    ${ride2
+      ? `<button type="button" class="btn btn-sage mt12" onclick="finish()">${ic('check')}하차하고 마무리하기</button>`
+      : `<button type="button" class="btn btn-sage mt12" onclick="toTransfer()">${ic('pause')}환승하고 이어하기</button>`}
+    <button type="button" class="btn btn-outline" onclick="togglePause()">${S.paused?'다시 시작하기':'활동 잠시 멈추기'}</button>
+    <button type="button" class="tlink" onclick="finish()">이동을 마치고 기록 보기${ic('right')}</button>
+  </div>${tabbar()}`;
+},
+transfer(){
+  return `<div class="body">
+    <div class="walkart">
+      <div class="wa-row">
+        <span class="wa-a">${ic('train')}</span>
+        <span class="wa-line"><i style="left:6%"></i><i class="m"></i><i style="left:94%"></i></span>
+        <span class="wa-b">${ic('pin')}</span>
+      </div>
+      <small>약 5분</small>
+    </div>
+    <div class="eyebrow mt28">Moving between lines</div>
+    <h2 class="title">걷는 동안은<br>이동에 집중하세요.</h2>
+    <p class="lead">멈춘 활동은 여기서 기억하고 있을게요.<br>다음 승강장에 도착하면 한 번에 이어갈 수 있어요.</p>
+    <div class="card saved">
+      <span class="icon-tile mist">${ic('pause')}</span>
+      <div class="s-t"><small>잠깐 멈춘 활동 · 출근길</small><b>전자책 이어읽기</b><span><span data-bind="saved"></span>p에 저장됨</span></div>
+      <span class="ok">${ic('check')}</span>
+    </div>
+    <button type="button" class="btn btn-primary mt20" onclick="toReturn()">다음 승강장에 도착했어요${ic('right')}</button>
+    <button type="button" class="tlink" onclick="finish()">오늘 이동을 마칠게요</button>
+  </div>${tabbar()}`;
+},
+ret(){
+  return `<div class="body">
+    <div class="orbit">${ORBIT}<span class="core">${ic('book')}</span></div>
+    <div class="rp-head"><span class="eyebrow"><i class="dot acc"></i>Return point</span><small>여기서부터</small></div>
+    <h2 class="title">아까 읽던 책,<br>이어서 읽어볼까요?</h2>
+    <p class="lead">멈춘 곳에서 바로 이어갈 수 있어요.</p>
+    <div class="card bookcard">
+      <div class="cv">${cover()}</div>
+      <div>
+        <small>밀리의 서재 · 독서</small>
+        <b>달러구트 꿈 백화점</b>
+        <div class="bp"><div class="bar"><i data-w="page"></i></div><strong><span data-bind="saved"></span>p</strong><span>마지막 읽던 위치</span></div>
+      </div>
+    </div>
+    <div class="infobox"><span class="ib-i">${ic('sparkles')}</span><span>환승 전 활동이 안전하게 저장됐어요.<br>이어읽기를 누르면 같은 자리에서 열려요.</span></div>
+    <button type="button" class="btn btn-primary mt20" onclick="resume()">이어읽기${ic('right')}</button>
+    <button type="button" class="btn btn-outline" onclick="finish()">오늘은 여기까지 할게요</button>
+  </div>${tabbar()}`;
+},
+reminder(){
+  return `<div class="body">
+    <span class="icon-tile mt8" style="width:52px;height:52px;border-radius:14px">${ic('downleft')}</span>
+    <div class="eyebrow mt24">A little reminder</div>
+    <h2 class="title">아까 읽던 책,<br>여기서 기다리고 있어요.</h2>
+    <p class="lead">전자책 이어읽기<br><span data-bind="saved"></span>p부터 바로 이어볼 수 있어요.</p>
+    <div class="card mini">
+      <span class="icon-tile lav">${ic('book')}</span>
+      <span><b>달러구트 꿈 백화점</b><small>밀리의 서재 · 마지막으로 멈춘 위치</small></span>
+      <i class="dot acc"></i>
+    </div>
+    <button type="button" class="btn btn-primary mt20" onclick="backToActivity()">원래 활동으로 돌아가기${ic('right')}</button>
+    <button type="button" class="btn btn-outline" onclick="browseMore()">조금 더 둘러볼게요</button>
+    <p class="caption">원할 때 언제든 다시 돌아올 수 있어요</p>
+  </div>${tabbar('history')}`;
+},
+record(){
+  const twoRides = S.flow.includes('resume');
+  return `<div class="body center">
+    <div class="orbit">${ORBIT}<span class="halo"></span><span class="core dark">${ic('check')}</span></div>
+    <div class="eyebrow">A moment well spent</div>
+    <h2 class="title">오늘 출근길,<br><span style="color:var(--primary);font-weight:400">독서 완료</span></h2>
+    <p class="lead">내가 고른 활동으로 채운 이동 시간,<br>오늘도 수고했어요.</p>
+    <div class="card metrics" style="text-align:left">
+      <div><small>활동 시간</small><div class="v">${readMin()}<small>분</small></div></div>
+      <div><small>읽은 범위</small><div class="v sm">${S.startPage}p → ${S.page}p</div></div>
+    </div>
+    <div class="weekly" style="text-align:left">
+      <span class="ib-i icon-tile" style="width:32px;height:32px;border-radius:9px;background:#fff">${ic('trend')}</span>
+      <span>${twoRides ? '두 번의 지하철 구간에서 이어 읽었어요.<br>' : ''}이번 주 출근 시간 중 ${weekly()}을<br>내가 선택한 활동으로 보냈어요.</span>
+      <span class="tag">WEEKLY</span>
+    </div>
+    <button type="button" class="btn btn-primary mt20" onclick="nextTrip()">다음 이동도 이어가기${ic('right')}</button>
+    <button type="button" class="btn btn-outline" onclick="toast('주간 기록 화면은 다음 버전에서 제공돼요')">활동 기록 보기${ic('chev')}</button>
+    <button type="button" class="tlink" onclick="nextTrip(true)">오늘 화면으로</button>
+  </div>${tabbar('history')}`;
+},
+};
+
+/* ---------- navigation ---------- */
+function render(name, dir='fwd'){
+  const host = $('#screens');
+  const old = host.firstElementChild;
+  const el = document.createElement('section');
+  el.className = 'scr ' + (dir==='none' ? '' : dir==='back' ? 'enter-back' : 'enter');
+  el.innerHTML = header(name) + VIEWS[name]();
+  host.appendChild(el);
+  if (old) setTimeout(() => old.remove(), 0);
+  refresh();
+}
+function go(name, opts={}){
+  if (!opts.replace && S.screen !== name) S.hist.push(S.screen);
+  S.screen = name;
+  render(name, opts.dir || 'fwd');
+}
+function goBack(){
+  if (S.reader) return closeReader();
+  const prev = S.hist.pop();
+  if (!prev) return toast('첫 화면이에요');
+  S.screen = prev; render(prev, 'back');
+}
+function rerender(){ render(S.screen, 'none'); }
+function tabNav(k){
+  if (k==='home') { if (S.screen!=='home') { S.hist=[]; S.screen='home'; render('home','back'); } return; }
+  if (k==='history') return S.done ? go('record') : toast('이번 이동을 마치면 기록이 쌓여요');
+  toast('이번 프로토타입은 홈 · 기록 흐름만 제공해요');
+}
+
+/* ---------- flow actions ---------- */
+function setClock(t){ S.clock = Math.max(S.clock, t); }
+function savePoint(){ S.savedPage = S.page; S.savedAt = hhmm(S.clock); }
+function pickBook(){ S.seg='walk'; setClock(T.walk); go('walk'); }
+function otherAct(){ toast('이번 테스트는 전자책 이어읽기 시나리오로 진행돼요'); }
+function arriveStation(){ S.seg='plat1'; setClock(T.plat1); go('platform'); }
+function startReading(){ S.paused=false; if (!S.flow.includes('start')) S.flow.push('start'); }
+function readFirst(){ startReading(); go('active'); openReader(); }
+function boardLater(){ setClock(T.ride1); S.seg='ride1'; startReading(); go('active'); toast(`열차에 탑승했어요 · ${S.page}p부터 이어가요`); }
+function toTransfer(){
+  hideHint(); closeReader(true); savePoint();
+  S.seg='transfer'; setClock(T.transfer); if (!S.flow.includes('pause')) S.flow.push('pause');
+  go('transfer');
+}
+function toReturn(){ S.seg='plat2'; setClock(T.plat2); go('ret'); }
+function resume(){
+  S.rideNo=2; S.paused=false; if (!S.flow.includes('resume')) S.flow.push('resume');
+  if (S.seg==='transfer') { S.seg='plat2'; setClock(T.plat2); }
+  go('active'); openReader();
+}
+function togglePause(){
+  S.paused = !S.paused; if (S.paused) savePoint();
+  toast(S.paused ? `${S.page}p에 저장하고 잠시 멈췄어요` : '다시 이어서 읽어요');
+  rerender();
+}
+function setTab(t){ S.tab=t; rerender(); }
+function finish(){
+  hideHint(); closeReader(true); closeSns(); savePoint();
+  S.done=true; S.seg='alight'; setClock(T.alight);
+  go('record');
+}
+function nextTrip(silent){
+  const keep = {speed:S.speed, nextPage:S.page, completed:true, weeklyBase:S.weeklyBase + readMin()};
+  const p = S.page;
+  S = fresh(keep);
+  render('home','back');
+  if (!silent) toast(`${p}p부터 다음 이동에서 이어갈게요`);
+}
+
+/* ---------- linked app (reader) ---------- */
+function openReader(){
+  S.reader = true;
+  const r = $('#reader');
+  r.innerHTML = `
+    <div class="rd-h"><button type="button" onclick="closeReader()" aria-label="닫기" style="display:grid;place-items:center;width:32px;height:32px">${ic('back')}</button>
+      <span class="rd-tag">연결 앱 · 밀리의 서재</span><small>달러구트 꿈 백화점 1</small></div>
+    <div class="rd-b">
+      <h4>— <span data-bind="page"></span> —</h4>
+      <p class="note">이 화면은 연결된 전자책 앱을 대신하는 프로토타입용 화면이에요. 실제 서비스에서는 마지막으로 읽던 페이지에서 바로 열립니다.</p>
+      ${[96,100,92,98,74,0,100,94,99,88,97,60,0,98,92,100,85].map(w => w ? `<div class="ln" style="width:${w}%"></div>` : '<div style="height:14px"></div>').join('')}
+    </div>
+    <div class="rd-f"><div class="row"><span>출근길 · <span data-bind="seg"></span> · <span data-bind="read"></span></span><span><span data-bind="page"></span> / ${TOTAL}</span></div><div class="bar"><i data-w="page"></i></div></div>
+    <button type="button" class="back-pill" onclick="closeReader()">${ic('back')}출근길 앱으로 돌아가기</button>`;
+  r.classList.add('show');
+  refresh();
+}
+function closeReader(silent){
+  if (!S.reader) return;
+  S.reader=false; $('#reader').classList.remove('show');
+  if (!silent && S.screen==='active') rerender();
+}
+
+/* ---------- SNS drift ---------- */
+let pushTimer;
+function openSns(){
+  if (S.done) return toast('이동이 끝난 뒤에는 상기 알림을 보내지 않아요');
+  closeReader(true); hideHint(); savePoint();
+  S.sns = true;
+  const s = $('#sns');
+  s.innerHTML = `<div class="sn-h"><span>feed</span><span class="row" style="gap:16px;color:#333">${ic('heart')}${ic('send')}</span></div>
+    <div class="stories">${'<i></i>'.repeat(6)}</div>
+    ${[0,1].map(()=>`<div class="post"><div class="ph"><i></i><span></span></div><div class="img"></div><div class="acts">${ic('heart')}${ic('msg')}${ic('send')}</div></div>`).join('')}
+    <span class="sn-tag">다른 앱(SNS) 시뮬레이션 화면</span>`;
+  s.classList.add('show');
+  $('#statusbar').classList.remove('light');
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(() => showPush(), 2200);
+}
+function showPush(){
+  const p = $('#push');
+  p.innerHTML = `<span class="pi">${ic('book')}</span><span class="pt"><span class="ph"><span>출근길</span><span>지금</span></span>
+    <b>아까 읽던 책, 여기서 기다리고 있어요</b><p>${S.savedPage}p부터 바로 이어볼 수 있어요.</p></span>`;
+  p.classList.add('show');
+  p.onclick = () => { p.classList.remove('show'); closeSns(); go('reminder'); };
+  setTimeout(() => p.classList.remove('show'), 7000);
+}
+function closeSns(){ S.sns=false; clearTimeout(pushTimer); $('#sns').classList.remove('show'); $('#push').classList.remove('show'); }
+function backToActivity(){
+  if (S.seg==='transfer' || S.seg==='plat2' || S.rideNo===2) return resume();
+  S.paused=false; startReading(); go('active'); openReader();
+}
+function browseMore(){ goBack(); openSns(); clearTimeout(pushTimer); toast('언제든 다시 돌아올 수 있어요'); }
+
+/* ---------- transfer hint (small, non-blocking) ---------- */
+let hintTimer;
+function showHint(){
+  if (S.screen!=='active' || S.rideNo===2) return toast('지하철 1구간에서 독서 중일 때 확인할 수 있어요');
+  S.page = Math.max(S.page, S.startPage+9); S.readSec = Math.max(S.readSec, 16*M); setClock(T.transfer - 2*M); S.seg='ride1';
+  const h = $('#hint');
+  h.innerHTML = `<span class="icon-tile">${ic('train')}</span><span><b>환승까지 약 2분</b><small>내릴 곳이 가까워졌어요</small></span>
+    <button type="button" onclick="saveHere()">여기까지 저장</button>`;
+  h.classList.add('show'); refresh();
+  clearTimeout(hintTimer); hintTimer = setTimeout(hideHint, 9000);
+}
+function saveHere(){
+  savePoint();
+  const h = $('#hint');
+  h.innerHTML = `<span class="icon-tile">${ic('check')}</span><span><b>${S.savedPage}p에 저장했어요</b><small>다음 승강장에서 이어갈 수 있어요</small></span>`;
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(() => { hideHint(); toTransfer(); }, 1400);
+}
+function hideHint(){ clearTimeout(hintTimer); $('#hint').classList.remove('show'); }
+
+/* ---------- lock screen ---------- */
+function showLock(){
+  const segIdx = Math.max(0, SEGS.indexOf(S.seg));
+  const l = $('#lock');
+  l.innerHTML = `<div class="lk-d">10월 10일 토요일</div><div class="lk-t" data-bind="clockShort"></div>
+    <div class="la"><div class="la-h"><span class="ai">${ic('book')}</span>출근길 · <span data-bind="seg"></span></div>
+      <b>오늘의 출근길: 전자책 이어읽기</b><p>지난번 읽던 위치(<span data-bind="saved"></span>p)를 준비해둘게요.</p>
+      <div class="segs">${[7,3,18,5,3,15,4].map((w,i)=>`<i class="${i<=segIdx?'on':''}" style="flex:${w}"></i>`).join('')}</div></div>
+    <div class="lk-hint">탭하면 잠금화면이 닫혀요</div>`;
+  l.classList.add('show');
+  $('#statusbar').classList.add('light'); $('#homeInd').classList.add('light');
+  l.onclick = () => { l.classList.remove('show'); $('#statusbar').classList.remove('light'); $('#homeInd').classList.remove('light'); };
+  refresh();
+}
+
+/* ---------- toast ---------- */
+let toastTimer;
+function toast(msg){
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+/* =========================================================
+   Simulation panel (TEST)
+   ========================================================= */
+// 구간 점프 시 시나리오 기준 값으로 맞춘다 (1구간 끝 +9p·18분, 하차 +19p·32분)
+function setProgress(pages, secs, flow){
+  S.page = S.startPage + pages; S.readSec = secs; S.acc = 0; S.flow = flow;
+  S.savedPage = S.page; S.savedAt = pages ? hhmm(S.clock) : null;
+}
+function jump(seg){
+  closeSimPanel(); closeSns(); hideHint(); closeReader(true);
+  S.done=false; S.paused=false; S.rideNo=1;
+  S.clock = T[seg]; S.seg = seg;
+  if (seg==='walk'){ setProgress(0,0,[]); return go('walk'); }
+  if (seg==='plat1'){ setProgress(0,0,[]); return go('platform'); }
+  if (seg==='ride1'){ setProgress(0,0,['start']); return go('active'); }
+  if (seg==='transfer'){ setProgress(9,18*M,['start']); return toTransfer(); }
+  if (seg==='plat2'){ setProgress(9,18*M,['start','pause']); return go('ret'); }
+  if (seg==='ride2'){ setProgress(9,18*M,['start','pause','resume']); S.rideNo=2; return go('active'); }
+  if (seg==='alight') return arriveEnd();
+}
+function arriveEnd(){
+  closeSimPanel();
+  S.page=Math.max(S.page,S.startPage+19); S.readSec=Math.max(S.readSec,32*M);
+  if (!S.flow.includes('resume') && S.flow.includes('pause')) S.flow.push('resume');
+  finish();
+}
+function ev(name){
+  closeSimPanel();
+  if (name==='hint') return showHint();
+  if (name==='sns') return openSns();
+  if (name==='lock') return showLock();
+  if (name==='end') return arriveEnd();
+}
+function setSpeed(v){ S.speed=v; renderSim(); }
+function resetAll(){ closeSimPanel(); closeSns(); hideHint(); closeReader(true); S = fresh({speed:S.speed}); render('home','back'); toast('처음 상태로 돌아왔어요'); }
+
+function renderSimStat(){
+  const st = $('#simStat'); if (!st) return;
+  st.innerHTML = `<div><span>시각</span><b>${hhmm(S.clock)}</b></div><div><span>구간</span><b>${SEG_LABEL[S.seg]}</b></div>
+    <div><span>현재 / 저장 페이지</span><b>${S.page}p / ${S.savedPage}p</b></div><div><span>활동 시간</span><b>${mmss(S.readSec)}</b></div>
+    <div><span>화면</span><b>${TITLES[S.screen]}${S.reader?' + 연결 앱':''}${S.sns?' + SNS':''}</b></div>`;
+}
+function renderSim(){
+  const segBtns = [['walk','도보 7분'],['plat1','승강장 1'],['ride1','지하철 1구간'],['transfer','환승 5분'],['plat2','승강장 2'],['ride2','지하철 2구간'],['alight','하차 · 기록']];
+  $('#sim').innerHTML = `
+    <div class="sm-h"><b><span>TEST</span>시뮬레이션</b><button type="button" onclick="closeSimPanel()" aria-label="닫기">${ic('x')}</button></div>
+    <div class="sm-b">
+      <h5>현재 상태</h5><div class="stat" id="simStat"></div>
+      <h5>이동 구간으로 이동</h5>
+      <div class="grid">${segBtns.map(([k,l])=>`<button type="button" class="${S.seg===k?'cur':''}" onclick="jump('${k}')">${l}</button>`).join('')}</div>
+      <h5>상황 만들기</h5>
+      <div class="grid">
+        <button type="button" class="ev" onclick="ev('hint')">환승 2분 전</button>
+        <button type="button" class="ev" onclick="ev('sns')">SNS로 이탈</button>
+        <button type="button" class="ev" onclick="ev('lock')">잠금화면 보기</button>
+        <button type="button" class="ev" onclick="ev('end')">하차 도착</button>
+      </div>
+      <h5>시간 배속</h5>
+      <div class="speed">${[1,10,60].map(v=>`<button type="button" class="${S.speed===v?'on':''}" onclick="setSpeed(${v})">${v}x</button>`).join('')}</div>
+      <p class="sm-note">가상 시간 기준: 08:00 출발 · 08:07 승강장 · 08:10 탑승 · 08:28 환승 · 08:36 2구간 탑승 · 08:51 하차.<br>‘환승 2분 전’은 지하철 1구간 독서 화면에서 사용할 수 있어요.</p>
+      <button type="button" class="reset" onclick="resetAll()">처음부터 다시 (132p)</button>
+    </div>`;
+  renderSimStat();
+}
+function openSimPanel(){ S.simOpen=true; renderSim(); $('#sim').classList.add('show'); $('#simDim').classList.add('show'); }
+function closeSimPanel(){ S.simOpen=false; $('#sim').classList.remove('show'); $('#simDim').classList.remove('show'); }
+$('#testTab').onclick = openSimPanel;
+$('#simDim').onclick = closeSimPanel;
+
+/* =========================================================
+   Clock loop
+   ========================================================= */
+const TICK = 250;
+setInterval(() => {
+  const dt = TICK/1000 * S.speed;
+  if (S.seg !== 'idle' && !S.done) S.clock += dt;
+  if (S.seg==='plat1' && S.clock >= T.ride1) S.seg='ride1';
+  if (S.seg==='plat2' && S.clock >= T.ride2) S.seg='ride2';
+  if (isReading()){
+    S.readSec += dt; S.acc += dt;
+    while (S.acc >= SEC_PER_PAGE){ S.acc -= SEC_PER_PAGE; if (S.page < TOTAL) S.page++; }
+  }
+  refresh();
+}, TICK);
+
+/* =========================================================
+   Desktop: scale the iPhone frame to fit the window
+   ========================================================= */
+const mobileMQ = matchMedia('(max-width:500px)');
+function fit(){
+  const fitEl = $('#fit'), dev = $('#device');
+  if (mobileMQ.matches){ dev.style.transform=''; fitEl.style.width=''; fitEl.style.height=''; return; }
+  const w = 393+24, h = 852+24;
+  const s = Math.min(1, (innerHeight-40)/h, (innerWidth-40)/w);
+  dev.style.transform = `scale(${s})`;
+  fitEl.style.width = w*s + 'px'; fitEl.style.height = h*s + 'px';
+}
+addEventListener('resize', fit); mobileMQ.addEventListener('change', fit); fit();
+
+render('home','none');
+</script>
+</body>
+</html>
